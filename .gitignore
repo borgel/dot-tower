@@ -1,4 +1,5 @@
 #eclipse
+debug/
 workspace/
 
 
@@ -55,3 +56,4 @@ Module.symvers
 Mkfile.old
 dkms.conf
 fw/.settings/language.settings.xml
+*.un~
