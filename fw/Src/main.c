@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "iprintf.h"
+#include <stdbool.h>
 
 /* USER CODE END Includes */
 
@@ -41,8 +42,11 @@
 /* USER CODE BEGIN PM */
 
 // 7 bit addresses
-#define DISPLAY_1_ADDR (0x77 << 1)
-#define DISPLAY_2_ADDR (0x76 << 1)
+#define DISPLAY_1_ADDR (0b1110111 << 1)	//0x77
+#define DISPLAY_2_ADDR (0b1110110 << 1)	//0x76
+
+#define DISPLAY_3_ADDR (0b1110100 << 1)
+#define DISPLAY_4_ADDR (0b1110101 << 1)
 
 /* USER CODE END PM */
 
@@ -75,6 +79,8 @@ void displayInit(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static bool addonDisplays = false;
 
 /* USER CODE END 0 */
 
@@ -129,6 +135,15 @@ int main(void)
 
   uint8_t buf[100];
   uint8_t roll = 0;
+
+  // turn all LEDs on
+  buf[0] = 0x00;
+  for(unsigned i = 0; i < 16; i++) {
+	  buf[i + 1] = 0xFF;
+  }
+  err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, buf, 17, 1000);
+  err += HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, buf, 17, 1000);
+  HAL_Delay(1000);
   while (1)
   {
 	  // reset LED write ptr to addr 0
@@ -152,6 +167,16 @@ int main(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+// set brightness to 0-15. 15 is max
+void setBrightness(uint8_t bright) {
+	HAL_StatusTypeDef err;
+	bright = 0xE0 | bright;
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, &bright, 1, 1000);
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, &bright, 1, 1000);
+	iprintf("write %d (ok is %d)\n", err, HAL_OK);
+
+}
 void displayInit(void) {
 	HAL_StatusTypeDef err;
 	//hi2c1
@@ -165,12 +190,14 @@ void displayInit(void) {
 	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, buf, 1, 1000);
 	iprintf("write osc en 2: %d (ok is %d)\n", err, HAL_OK);
 
-	// set brightness to 0-15
-	uint8_t bright = 8;
-	bright = 0xE0 | bright;
-	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, &bright, 1, 1000);
-	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, &bright, 1, 1000);
-	iprintf("write %d (ok is %d)\n", err, HAL_OK);
+	// probe for added displays
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_3_ADDR, buf, 1, 1000);
+	if(err == HAL_OK) {
+		addonDisplays = true;
+		iprintf("Addon displays present\n");
+	}
+
+	setBrightness(8);
 
 	uint8_t blink;
 	// no blink, enable display
