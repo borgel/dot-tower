@@ -40,6 +40,10 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
+// 7 bit addresses
+#define DISPLAY_1_ADDR (0x77 << 1)
+#define DISPLAY_2_ADDR (0x76 << 1)
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,6 +68,8 @@ static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
+
+void displayInit(void);
 
 /* USER CODE END PFP */
 
@@ -108,23 +114,72 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  iprintf("Booted...\n");
+  iprintf("Booted "__DATE__": "__TIME__ "\n");
+
+  displayInit();
+
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  // some LED test code
+  HAL_StatusTypeDef err;
+
+  uint8_t buf[100];
+  uint8_t roll = 0;
   while (1)
   {
+	  // reset LED write ptr to addr 0
+	  buf[0] = 0x00;
+	  // setup some fake data to send
+	  for(unsigned i = 0; i < 16; i++) {
+		  buf[i + 1] = i + roll;
+	  }
+	  unsigned bytes = 16 + 1;
+	  err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, buf, bytes, 1000);
+	  err += HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, buf, bytes, 1000);
+	  iprintf("both write led ptr: %d (ok is %d)\n", err, HAL_OK);
 
-	  iprintf("beep boop\n");
-	  HAL_Delay(100);
+	  roll++;
+	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
+
+/* USER CODE BEGIN 4 */
+void displayInit(void) {
+	HAL_StatusTypeDef err;
+	//hi2c1
+	//DISPLAY_1_ADDR, DISPLAY_2_ADDR
+
+	// enable osc
+	// write 0x20 | 0x1 (writes a 0x1 to reg 0x20 I guess)
+	uint8_t buf[] = {0x20 | 0x1};
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, buf, 1, 1000);
+	iprintf("write osc en 1: %d (ok is %d)\n", err, HAL_OK);
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, buf, 1, 1000);
+	iprintf("write osc en 2: %d (ok is %d)\n", err, HAL_OK);
+
+	// set brightness to 0-15
+	uint8_t bright = 8;
+	bright = 0xE0 | bright;
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, &bright, 1, 1000);
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, &bright, 1, 1000);
+	iprintf("write %d (ok is %d)\n", err, HAL_OK);
+
+	uint8_t blink;
+	// no blink, enable display
+	blink = 0x80 | 0x1;
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_1_ADDR, &blink, 1, 1000);
+	err = HAL_I2C_Master_Transmit(&hi2c1, DISPLAY_2_ADDR, &blink, 1, 1000);
+	iprintf("write %d (ok is %d)\n", err, HAL_OK);
+}
+/* USER CODE END 4 */
 
 /**
   * @brief System Clock Configuration
@@ -345,10 +400,6 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
 }
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
